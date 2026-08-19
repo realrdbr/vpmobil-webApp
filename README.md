@@ -23,5 +23,7 @@
 <li>Install the dependencies with pip install -r requirements.txt</li>
 <li>Rename the .env.example to .env</li>
 <li>Enter the VPMobil informations and other informations to the new .env</li>
+<li>Run the main.py</li>
+<li>Access the website with 127.0.0.1:8000 or the changed address from the .env</li>
 </ol></p>
 
