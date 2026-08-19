@@ -302,7 +302,7 @@ class RoomsPageHandler(BaseHTTPRequestHandler):
 def main():
     """Startet nur die Freie-Räume-Seite."""
 
-    start_server(RoomsPageHandler, 8001, "Freie-Räume-Seite")
+    start_server(RoomsPageHandler, "Freie-Räume-Seite")
 
 
 if __name__ == "__main__":

@@ -2,9 +2,13 @@ from datetime import date, datetime, timedelta
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 
-DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = int(os.getenv("PORT", 8000))
+DEFAULT_HOST = os.getenv("HOST", "127.0.0.1")
 
 
 def parse_date(value: str | None) -> date:
@@ -138,7 +142,7 @@ def join_cookie_list(values: list[str]) -> str:
     return ",".join(values)
 
 
-def start_server(handler_class: type[BaseHTTPRequestHandler], port: int, title: str) -> None:
+def start_server(handler_class: type[BaseHTTPRequestHandler], title: str, port: int = DEFAULT_PORT) -> None:
     """Startet einen lokalen HTTP-Server."""
 
     server = ThreadingHTTPServer((DEFAULT_HOST, port), handler_class)
