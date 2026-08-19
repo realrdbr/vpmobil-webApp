@@ -15,3 +15,13 @@
 <p>Modern UI</p>
 <p>Fetches all classes automatically</p>
 <p>only needs set-up once with school-login-data</p>
+<br>
+<br>
+<h2>Setup Guide:</h2>
+<p><ol>
+<li>Pull the repository</li>
+<li>Install the dependencies with pip install -r requirements.txt</li>
+<li>Rename the .env.example to .env</li>
+<li>Enter the VPMobil informations and other informations to the new .env</li>
+</ol></p>
+
