@@ -1,0 +1,11 @@
+certifi
+charset-normalizer
+idna
+multidict
+propcache
+python-dotenv
+pyyaml
+requests
+toml
+urllib3
+yarl
