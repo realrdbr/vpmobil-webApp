@@ -21,6 +21,10 @@ from web_utils import (
     send_html,
     split_cookie_list,
 )
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class AppRequestHandler(BaseHTTPRequestHandler):
@@ -187,8 +191,8 @@ class AppRequestHandler(BaseHTTPRequestHandler):
 def main():
     """Startet die gesamte lokale Webanwendung."""
 
-    host = "192.168.178.101"
-    port = 8000
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", 8000))
     server = ThreadingHTTPServer((host, port), AppRequestHandler)
 
     print(f"Webanwendung läuft unter http://{host}:{port}")

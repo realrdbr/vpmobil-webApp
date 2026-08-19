@@ -690,7 +690,7 @@ class TeacherPageHandler(BaseHTTPRequestHandler):
 def main():
     """Startet nur die Lehrerplan-Seite."""
 
-    start_server(TeacherPageHandler, 8002, "Lehrerplan-Seite")
+    start_server(TeacherPageHandler, "Lehrerplan-Seite")
 
 
 if __name__ == "__main__":
