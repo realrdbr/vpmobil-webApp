@@ -2,17 +2,14 @@ from datetime import date, timedelta
 from html import escape
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlencode, urlparse
-from dotenv import load_dotenv
-import os
 
-from vp_data import ResourceNotFound, Unauthorized, fetch_plan, fetch_week_plans
+from vp_data import ResourceNotFound, Unauthorized, fetch_week_plans
 from web_utils import (
     COMMON_CSS,
     format_week_value,
     join_cookie_list,
     make_cookie,
     parse_cookie_header,
-    parse_date,
     parse_week,
     query_value,
     query_values,
@@ -21,7 +18,6 @@ from web_utils import (
     split_cookie_list,
     start_server,
 )
-
 
 DAY_NAMES = {
     0: "Mo",

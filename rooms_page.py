@@ -1,8 +1,10 @@
+import json
+import os
 from datetime import date
 from html import escape
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
-import os, json
+
 from dotenv import load_dotenv
 
 from vp_data import ResourceNotFound, Unauthorized, find_free_rooms

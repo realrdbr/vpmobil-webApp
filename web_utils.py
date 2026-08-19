@@ -1,9 +1,9 @@
+import os
 from datetime import date, datetime, timedelta
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs
+
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 

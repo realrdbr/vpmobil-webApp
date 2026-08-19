@@ -1,7 +1,10 @@
+import json
+import os
+import pickle
 from datetime import date, datetime, timedelta
 from pathlib import Path
+
 from dotenv import load_dotenv
-import pickle, os, json
 
 from vpmobil import ResourceNotFound, Unauthorized, VertretungsplanZugang
 
