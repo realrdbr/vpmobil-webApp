@@ -241,8 +241,7 @@ def collect_relevant_classes(plan) -> list:
             if not main_class_found and str(grade) in plan.klassen:
                 classes.append(plan.klassen[str(grade)])
                 main_class_found = True
-
-    return sorted(classes, key=natural_sort_key)
+    return classes
 
 
 def extract_room_number(room_value: object) -> int | None:
