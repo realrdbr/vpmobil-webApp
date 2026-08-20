@@ -1,9 +1,20 @@
+import json
+import re
 from datetime import date, timedelta
 from html import escape
 from http.server import BaseHTTPRequestHandler
+from threading import Lock, Thread
+from time import monotonic
 from urllib.parse import parse_qs, urlencode, urlparse
 
-from vp_data import ResourceNotFound, Unauthorized, fetch_week_plans
+from vp_data import (
+    ResourceNotFound,
+    Unauthorized,
+    fetch_week_plans,
+    get_cache_path,
+    get_school_week_dates,
+    load_plan_from_cache,
+)
 from web_utils import (
     COMMON_CSS,
     format_week_value,
@@ -16,7 +27,7 @@ from web_utils import (
     redirect,
     send_html,
     split_cookie_list,
-    start_server,
+    start_server, DEFAULT_PORT,
 )
 
 DAY_NAMES = {
@@ -26,6 +37,106 @@ DAY_NAMES = {
     3: "Do",
     4: "Fr",
 }
+
+
+WEEK_REFRESH_INTERVAL_SECONDS = 30
+_week_cache: dict[date, dict[date, object | None]] = {}
+_week_refreshing: set[date] = set()
+_week_last_refresh: dict[date, float] = {}
+_week_cache_lock = Lock()
+
+
+def natural_sort_key(item):
+    # Spaltet den String in Zahlen (als int) und Textabschnitte auf
+    return [
+        int(text) if text.isdigit() else text for text in re.split(r"(\d+)", item)
+    ]
+
+
+def get_week_version(week_plans: dict[date, object | None]) -> str:
+    """Erzeugt eine kurze Version aus den Plan-Zeitstempeln der Woche."""
+
+    return "|".join(
+        f"{plan_date.isoformat()}:{getattr(plan, 'zeitstempel', '') or ''}"
+        for plan_date, plan in week_plans.items()
+    )
+
+
+def load_cached_week_plans(selected_date: date) -> tuple[dict[date, object | None], bool]:
+    """Lädt vorhandene Tagespläne direkt aus dem lokalen Cache."""
+
+    cached_plans = {}
+    has_cache = False
+
+    for plan_date in get_school_week_dates(selected_date):
+        if get_cache_path(plan_date).exists():
+            has_cache = True
+            cached_plans[plan_date] = load_plan_from_cache(plan_date)
+        else:
+            cached_plans[plan_date] = None
+
+    return cached_plans, has_cache
+
+
+def refresh_week_in_background(selected_date: date) -> None:
+    """Aktualisiert eine Woche im Hintergrund, höchstens einmal pro Intervall."""
+
+    now = monotonic()
+
+    with _week_cache_lock:
+        last_refresh = _week_last_refresh.get(selected_date, 0)
+
+        if (
+            selected_date in _week_refreshing
+            or now - last_refresh < WEEK_REFRESH_INTERVAL_SECONDS
+        ):
+            return
+
+        _week_refreshing.add(selected_date)
+
+    def refresh() -> None:
+        try:
+            refreshed_plans = fetch_week_plans(selected_date)
+
+            with _week_cache_lock:
+                _week_cache[selected_date] = refreshed_plans
+        except Exception as error:
+            print(f"Hintergrund-Refresh für {selected_date.isoformat()} fehlgeschlagen: {error}")
+        finally:
+            with _week_cache_lock:
+                _week_refreshing.discard(selected_date)
+                _week_last_refresh[selected_date] = monotonic()
+
+    Thread(target=refresh, daemon=True).start()
+
+
+def get_week_plans_for_page(selected_date: date) -> dict[date, object | None]:
+    """Gibt Pläne schnell aus dem Speicher/Cache zurück und startet ein Update."""
+
+    with _week_cache_lock:
+        cached_week = _week_cache.get(selected_date)
+
+    if cached_week is not None:
+        refresh_week_in_background(selected_date)
+        return cached_week
+
+    cached_week, has_cache = load_cached_week_plans(selected_date)
+
+    if has_cache:
+        with _week_cache_lock:
+            _week_cache[selected_date] = cached_week
+
+        refresh_week_in_background(selected_date)
+        return cached_week
+
+    # Beim allerersten Aufruf ohne Cache muss einmal synchron geladen werden.
+    fresh_week = fetch_week_plans(selected_date)
+
+    with _week_cache_lock:
+        _week_cache[selected_date] = fresh_week
+        _week_last_refresh[selected_date] = monotonic()
+
+    return fresh_week
 
 
 def format_time(value) -> str:
@@ -90,7 +201,7 @@ def get_available_classes(week_plans: dict[date, object | None]) -> list[str]:
 
         classes.update(plan.klassen.keys())
 
-    return sorted(classes)
+    return sorted(classes, key=natural_sort_key)
 
 
 def get_class_subject_options(week_plans: dict[date, object | None], class_name: str) -> list[str]:
@@ -399,6 +510,7 @@ def render_plan_page(
     content = ""
     week_title = selected_date.strftime("%d.%m.%Y")
     plan_timestamp_text = "unbekannt"
+    week_version = ""
 
     if error_message:
         content = f"""
@@ -408,9 +520,10 @@ def render_plan_page(
             </section>
         """
     else:
-        week_plans = fetch_week_plans(selected_date)
+        week_plans = get_week_plans_for_page(selected_date)
         week_title = get_week_title(week_plans)
         plan_timestamp_text = get_latest_timestamp_text(week_plans)
+        week_version = get_week_version(week_plans)
 
         available_classes = get_available_classes(week_plans)
 
@@ -691,6 +804,11 @@ def render_plan_page(
             box-shadow: 0 18px 48px rgba(16, 24, 40, 0.22);
         }}
 
+        .week-lesson.popup-open-up .popup-content {{
+            top: auto;
+            bottom: calc(100% + 6px);
+        }}
+
         .popup-row {{
             display: grid;
             grid-template-columns: 78px 1fr;
@@ -893,6 +1011,54 @@ def render_plan_page(
 
         {content}
     </main>
+    {f'''<script>
+        (() => {{
+            const initialVersion = {json.dumps(week_version)};
+            const checkUrl = "/api/plan-version?woche={format_week_value(selected_date)}";
+
+            setInterval(() => {{
+                fetch(checkUrl, {{cache: "no-store"}})
+                    .then(response => response.json())
+                    .then(data => {{
+                        if (data.version !== initialVersion) {{
+                            window.location.reload();
+                        }}
+                    }})
+                    .catch(() => {{}});
+            }}, 30000);
+
+            document.querySelectorAll("details.week-lesson").forEach(details => {{
+                details.addEventListener("toggle", () => {{
+                    details.classList.remove("popup-open-up");
+
+                    if (!details.open) {{
+                        return;
+                    }}
+
+                    requestAnimationFrame(() => {{
+                        const popup = details.querySelector(".popup-content");
+                        const detailsRect = details.getBoundingClientRect();
+                        const popupRect = popup.getBoundingClientRect();
+                        const hasRoomAbove = detailsRect.top >= popupRect.height + 12;
+
+                        if (popupRect.bottom > window.innerHeight - 12 && hasRoomAbove) {{
+                            details.classList.add("popup-open-up");
+                        }}
+                    }});
+                }});
+            }});
+
+            document.addEventListener("click", event => {{
+                if (event.target.closest("details.week-lesson")) {{
+                    return;
+                }}
+
+                document.querySelectorAll("details.week-lesson[open]").forEach(details => {{
+                    details.removeAttribute("open");
+                }});
+            }});
+        }})();
+    </script>''' if week_version else ""}
 </body>
 </html>"""
 
@@ -908,6 +1074,18 @@ class PlanPageHandler(BaseHTTPRequestHandler):
         browser_cookies = parse_cookie_header(self.headers.get("Cookie"))
 
         selected_date = parse_week(query_value(query, "woche"))
+
+        if parsed_url.path == "/api/plan-version":
+            week_plans = get_week_plans_for_page(selected_date)
+            version = get_week_version(week_plans)
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(json.dumps({"version": version}).encode("utf-8"))
+            return
+
         selected_class = query_value(query, "klasse") or browser_cookies.get("selected_class")
         selected_subjects = []
         cookie_headers = []
@@ -972,10 +1150,14 @@ class PlanPageHandler(BaseHTTPRequestHandler):
         return
 
 
-def main():
+def main(additional_port: int = 0):
     """Startet nur die Vertretungsplan-Seite."""
 
-    start_server(PlanPageHandler, "Vertretungsplan-Seite")
+    try:
+        start_server(PlanPageHandler, "Vertretungsplan-Seite", port=DEFAULT_PORT + additional_port)
+    except OSError:
+        additional_port += 1
+        main(additional_port)
 
 
 if __name__ == "__main__":

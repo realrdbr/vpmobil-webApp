@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from dotenv import load_dotenv
 
 from vp_data import ResourceNotFound, Unauthorized, find_free_rooms
-from web_utils import COMMON_CSS, parse_date, parse_hour, query_value, send_html, start_server
+from web_utils import COMMON_CSS, parse_date, parse_hour, query_value, send_html, start_server, DEFAULT_PORT
 
 load_dotenv()
 
@@ -301,10 +301,14 @@ class RoomsPageHandler(BaseHTTPRequestHandler):
         return
 
 
-def main():
+def main(additional_port: int = 0):
     """Startet nur die Freie-Räume-Seite."""
 
-    start_server(RoomsPageHandler, "Freie-Räume-Seite")
+    try:
+        start_server(RoomsPageHandler, "Freie-Räume-Seite", port = DEFAULT_PORT + additional_port)
+    except OSError:
+        additional_port += 1
+        main(additional_port)
 
 
 if __name__ == "__main__":

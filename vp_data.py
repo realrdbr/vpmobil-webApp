@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -27,6 +28,13 @@ ALL_ROOMS = json.loads(os.getenv("ALL_ROOMS"))
 
 
 ALPHABET = "abcdefghijklmnopqrstuvwxyz"
+
+
+def natural_sort_key(item):
+    # Spaltet den String in Zahlen (als int) und Textabschnitte auf
+    return [
+        int(text) if text.isdigit() else text for text in re.split(r"(\d+)", item)
+    ]
 
 
 def log(message: str) -> None:
@@ -234,7 +242,7 @@ def collect_relevant_classes(plan) -> list:
                 classes.append(plan.klassen[str(grade)])
                 main_class_found = True
 
-    return classes
+    return sorted(classes, key=natural_sort_key)
 
 
 def extract_room_number(room_value: object) -> int | None:

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from html import escape
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -13,7 +13,7 @@ from web_utils import (
     query_value,
     redirect,
     send_html,
-    start_server,
+    start_server, DEFAULT_PORT,
 )
 
 
@@ -258,6 +258,34 @@ def get_latest_timestamp_text(week_plans: dict[date, object | None]) -> str:
     return max(timestamps).strftime("%d.%m.%Y %H:%M")
 
 
+def render_week_navigation(selected_date: date, selected_teacher: str | None) -> str:
+    """Rendert die Navigation für die vorherige und nächste Schulwoche."""
+
+    previous_week = selected_date - timedelta(days=7)
+    next_week = selected_date + timedelta(days=7)
+    current_week = date.today() - timedelta(days=date.today().weekday())
+    teacher_query = f"&{urlencode({'lehrer': selected_teacher})}" if selected_teacher else ""
+
+    return f"""
+        <div class="week-navigation" aria-label="Wochennavigation">
+            <a class="week-nav-button" href="/lehrer?woche={format_week_value(previous_week)}{teacher_query}" aria-label="Vorherige Woche">
+                <span aria-hidden="true">‹</span>
+                <small>Zurück</small>
+            </a>
+
+            <a class="week-nav-button week-nav-button--current" href="/lehrer?woche={format_week_value(current_week)}{teacher_query}">
+                <span aria-hidden="true">⌂</span>
+                <small>Aktuelle Woche</small>
+            </a>
+
+            <a class="week-nav-button" href="/lehrer?woche={format_week_value(next_week)}{teacher_query}" aria-label="Nächste Woche">
+                <span aria-hidden="true">›</span>
+                <small>Weiter</small>
+            </a>
+        </div>
+    """
+
+
 def render_teacher_page(
     selected_date: date,
     selected_teacher: str | None = None,
@@ -326,6 +354,54 @@ def render_teacher_page(
             background: var(--surface-muted);
             color: var(--text);
             border: 1px solid var(--border);
+        }}
+
+        .week-navigation {{
+            display: grid;
+            grid-template-columns: minmax(190px, 1fr) minmax(240px, 1.25fr) minmax(190px, 1fr);
+            gap: 14px;
+            align-items: center;
+            width: 100%;
+        }}
+
+        .week-nav-button {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 64px;
+            padding: 8px 14px;
+            border: 1px solid #c7d2fe;
+            border-radius: 16px;
+            background: #eef2ff;
+            color: var(--primary-dark);
+            text-decoration: none;
+            font-weight: 900;
+        }}
+
+        .week-nav-button--current {{
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }}
+
+        .week-nav-button--current:hover {{
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }}
+
+        .week-nav-button:hover {{
+            background: #e0e7ff;
+            border-color: var(--primary);
+        }}
+
+        .week-nav-button span {{
+            font-size: 2rem;
+            line-height: 1;
+        }}
+
+        .week-nav-button small {{
+            font-size: 0.85rem;
         }}
 
         .week-table-wrap {{
@@ -545,6 +621,25 @@ def render_teacher_page(
                 display: grid;
             }}
 
+            .week-navigation {{
+                grid-template-columns: 1fr 1.25fr 1fr;
+                gap: 10px;
+            }}
+
+            .week-nav-button {{
+                min-height: 48px;
+                padding: 6px 8px;
+                gap: 4px;
+            }}
+
+            .week-nav-button span {{
+                font-size: 1.55rem;
+            }}
+
+            .week-nav-button small {{
+                font-size: 0.72rem;
+            }}
+
             .week-table-wrap {{
                 border-radius: 12px;
             }}
@@ -611,16 +706,7 @@ def render_teacher_page(
         </header>
 
         <section class="panel">
-            <form method="get" action="/lehrer" class="form-row">
-                <label>
-                    Woche
-                    <input type="week" name="woche" value="{format_week_value(selected_date)}">
-                </label>
-
-                {f'<input type="hidden" name="lehrer" value="{escape(selected_teacher)}">' if selected_teacher else ""}
-
-                <button type="submit">Anzeigen</button>
-            </form>
+            {render_week_navigation(selected_date, selected_teacher)}
 
             <div class="meta">
                 Neuester Planstand: {escape(plan_timestamp_text)}
@@ -687,10 +773,14 @@ class TeacherPageHandler(BaseHTTPRequestHandler):
         return
 
 
-def main():
+def main(additional_port: int = 0):
     """Startet nur die Lehrerplan-Seite."""
 
-    start_server(TeacherPageHandler, "Lehrerplan-Seite")
+    try:
+        start_server(TeacherPageHandler, "Lehrerplan-Seite", port=DEFAULT_PORT + additional_port)
+    except OSError:
+        additional_port += 1
+        main(additional_port)
 
 
 if __name__ == "__main__":

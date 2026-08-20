@@ -188,14 +188,20 @@ class AppRequestHandler(BaseHTTPRequestHandler):
         return
 
 
-def main():
+def main(additional_port: int = 0):
     """Startet die gesamte lokale Webanwendung."""
 
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", 8000))
-    server = ThreadingHTTPServer((host, port), AppRequestHandler)
 
-    print(f"Webanwendung läuft unter http://{host}:{port}")
+    try:
+        server = ThreadingHTTPServer((host, port+additional_port), AppRequestHandler)
+    except OSError:
+        print(f"Port {port+additional_port} ist bereits in Verwendung. Versuch {additional_port+1}:")
+        additional_port += 1
+        main(additional_port)
+
+    print(f"Webanwendung läuft unter http://{host}:{port+additional_port}")
     print("Klassenseite: /")
     print("Lehrerseite: /lehrer")
     print("Freie Räume: /raeume")
