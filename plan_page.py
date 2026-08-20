@@ -1035,13 +1035,22 @@ def render_plan_page(
                         return;
                     }}
 
+                    document.querySelectorAll("details.week-lesson[open]").forEach(otherDetails => {{
+                        if (otherDetails !== details) {{
+                            otherDetails.removeAttribute("open");
+                            otherDetails.classList.remove("popup-open-up");
+                        }}
+                    }});
+
                     requestAnimationFrame(() => {{
                         const popup = details.querySelector(".popup-content");
                         const detailsRect = details.getBoundingClientRect();
                         const popupRect = popup.getBoundingClientRect();
-                        const hasRoomAbove = detailsRect.top >= popupRect.height + 12;
+                        const spaceAbove = detailsRect.top;
+                        const spaceBelow = window.innerHeight - detailsRect.bottom;
+                        const popupSpace = popupRect.height + 12;
 
-                        if (popupRect.bottom > window.innerHeight - 12 && hasRoomAbove) {{
+                        if (spaceBelow < popupSpace && spaceAbove >= popupSpace) {{
                             details.classList.add("popup-open-up");
                         }}
                     }});

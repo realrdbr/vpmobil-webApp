@@ -1,7 +1,10 @@
+import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from plan_page import (
+    get_week_plans_for_page,
+    get_week_version,
     get_selected_subject_cookie_name,
     render_plan_page,
 )
@@ -35,6 +38,19 @@ class AppRequestHandler(BaseHTTPRequestHandler):
 
         parsed_url = urlparse(self.path)
         query = parse_qs(parsed_url.query)
+
+        if parsed_url.path == "/api/plan-version":
+            selected_date = parse_week(query_value(query, "woche"))
+            week_plans = get_week_plans_for_page(selected_date)
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(
+                json.dumps({"version": get_week_version(week_plans)}).encode("utf-8")
+            )
+            return
 
         if parsed_url.path == "/raeume":
             self.handle_rooms_page(query)
