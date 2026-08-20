@@ -19,7 +19,7 @@
 <br>
 <h2>Setup Guide:</h2>
 <p><ol>
-<li>Pull the repository</li>
+<li>Pull the repository with ´git pull https://github.com/realrdbr/vpmobil-webApp.git´</li>
 <li>Install the dependencies with pip install -r requirements.txt</li>
 <li>Rename the .env.example to .env</li>
 <li>Enter the VPMobil informations and other informations to the new .env</li>
